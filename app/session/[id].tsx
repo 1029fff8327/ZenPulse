@@ -6,14 +6,15 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import React, { useEffect, useMemo, useState } from "react";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { MEDITATIONS } from "../../src/data/meditations";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useSubscription } from "../../src/state/subscription";
 
 type SessionStatus = "idle" | "running" | "paused" | "done";
@@ -33,6 +34,16 @@ function formatTime(totalSeconds: number) {
 
 export default function SessionScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isSmall = width <= 360;
+  const isLarge = width >= 430;
+
+  const padH = isSmall ? 14 : 16;
+  const padBottom = 20 + insets.bottom;
+
+  const timerFontSize = isSmall ? 38 : isLarge ? 52 : 44;
+
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const rawId = params.id;
   const id = Array.isArray(rawId) ? rawId[0] : rawId;
@@ -52,35 +63,28 @@ export default function SessionScreen() {
   const [status, setStatus] = useState<SessionStatus>("idle");
   const [remaining, setRemaining] = useState<number>(0);
 
-  // init remaining when item loaded
   useEffect(() => {
     if (!item) return;
     setStatus("idle");
     setRemaining(item.minutes * 60);
   }, [item?.id]);
 
-  // gate premium content
   useEffect(() => {
     if (!hydrated) return;
     if (!item) return;
-
     if (item.isPremium && !isSubscribed) {
       router.replace("/paywall");
     }
   }, [hydrated, item?.id, item?.isPremium, isSubscribed, router]);
 
-  // countdown
   useEffect(() => {
     if (status !== "running") return;
-
     const t = setInterval(() => {
       setRemaining((prev) => Math.max(0, prev - 1));
     }, 1000);
-
     return () => clearInterval(t);
   }, [status]);
 
-  // auto-done when reaches zero
   useEffect(() => {
     if (status === "running" && remaining <= 0) {
       setStatus("done");
@@ -98,6 +102,9 @@ export default function SessionScreen() {
   const description = item
     ? `A gentle ${item.minutes}-minute practice to settle your mind and soften your breath. Stay present — one calm moment at a time.`
     : "";
+
+  const blobSize = isSmall ? 460 : 520;
+  const blobStyle = { width: blobSize, height: blobSize, borderRadius: blobSize / 2 };
 
   function onStart() {
     if (!item) return;
@@ -135,27 +142,29 @@ export default function SessionScreen() {
     );
   }
 
-  // if item not found (bad id)
   if (!item) {
     return (
       <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
         <View style={styles.notFound}>
           <Text style={styles.notFoundTitle}>Session not found</Text>
-          <Text style={styles.notFoundSub}>No meditation with id: {String(id ?? "")}</Text>
+          <Text style={styles.notFoundSub} numberOfLines={2}>
+            No meditation with id: {String(id ?? "")}
+          </Text>
 
           <Pressable
             onPress={() => router.replace("/meditations")}
-            style={({ pressed }) => [styles.primaryBtn, pressed && styles.btnPressed]}
+            style={({ pressed }) => [styles.secondaryBtn, pressed && styles.btnPressed]}
           >
-            <Text style={styles.primaryBtnText}>Back to Meditations</Text>
+            <View style={styles.btnInner}>
+              <Ionicons name="arrow-back" size={18} color="rgba(255,255,255,0.92)" />
+              <Text style={styles.secondaryBtnText}>Back</Text>
+            </View>
           </Pressable>
         </View>
       </SafeAreaView>
     );
   }
 
-  // If premium and not subscribed, effect already redirects,
-  // but render a tiny placeholder to avoid flicker.
   if (locked) {
     return (
       <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
@@ -175,7 +184,6 @@ export default function SessionScreen() {
         style={styles.bg}
         imageStyle={styles.bgImage}
       >
-        {/* Darken + premium gradients */}
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <LinearGradient
             colors={["rgba(5,6,10,0.10)", "rgba(5,6,10,0.85)", "rgba(5,6,10,0.98)"]}
@@ -187,19 +195,28 @@ export default function SessionScreen() {
             colors={["rgba(156,120,255,0.22)", "rgba(0,0,0,0)"]}
             start={{ x: 0.15, y: 0.05 }}
             end={{ x: 0.85, y: 0.60 }}
-            style={[styles.blob, styles.blobTop]}
+            style={[styles.blob, blobStyle, styles.blobTop]}
           />
           <LinearGradient
             colors={["rgba(70,210,255,0.16)", "rgba(0,0,0,0)"]}
             start={{ x: 0.05, y: 0.25 }}
             end={{ x: 0.95, y: 0.95 }}
-            style={[styles.blob, styles.blobBottom]}
+            style={[styles.blob, blobStyle, styles.blobBottom]}
           />
         </View>
 
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            { paddingHorizontal: padH, paddingBottom: padBottom },
+            isSmall && styles.contentSmall,
+            {
+              maxWidth: 560,
+              alignSelf: "center",
+              width: "100%",
+            },
+          ]}
           showsVerticalScrollIndicator={false}
         >
           {/* Top bar */}
@@ -215,7 +232,9 @@ export default function SessionScreen() {
               <View style={styles.brandIcon}>
                 <Ionicons name="leaf-outline" size={18} color="#EDEBFF" />
               </View>
-              <Text style={styles.brandText}>ZenPulse</Text>
+              <Text style={styles.brandText} numberOfLines={1}>
+                ZenPulse
+              </Text>
             </View>
 
             <View style={{ width: 40 }} />
@@ -224,29 +243,42 @@ export default function SessionScreen() {
           {/* Title block */}
           <View style={styles.titleBlock}>
             <View style={styles.titleRow}>
-              <Text style={styles.title}>{title}</Text>
+              <Text
+                style={[
+                  styles.title,
+                  isSmall && styles.titleSmall,
+                ]}
+                numberOfLines={2}
+              >
+                {title}
+              </Text>
+
               {item.isPremium && (
                 <View style={styles.premiumPill}>
                   <Ionicons name="sparkles" size={12} color="#0B0C10" />
-                  <Text style={styles.premiumPillText}>Premium</Text>
+                  <Text style={styles.premiumPillText} numberOfLines={1}>
+                    Premium
+                  </Text>
                 </View>
               )}
             </View>
 
             <View style={styles.metaRow}>
               <Ionicons name="time-outline" size={14} color="rgba(255,255,255,0.75)" />
-              <Text style={styles.metaText}>{item.minutes} min</Text>
+              <Text style={styles.metaText} numberOfLines={1}>
+                {item.minutes} min
+              </Text>
             </View>
 
-            <Text style={styles.desc}>{description}</Text>
+            <Text style={[styles.desc, isSmall && styles.descSmall]}>{description}</Text>
           </View>
 
           {/* Timer card */}
-          <View style={styles.glassCard}>
+          <View style={[styles.glassCard, isSmall && styles.glassCardSmall]}>
             <View style={styles.timerTop}>
               <View style={styles.timerLabelRow}>
                 <Ionicons name="pulse-outline" size={18} color="#EDEBFF" />
-                <Text style={styles.timerLabel}>
+                <Text style={styles.timerLabel} numberOfLines={1}>
                   {status === "idle"
                     ? "Ready"
                     : status === "running"
@@ -257,20 +289,25 @@ export default function SessionScreen() {
                 </Text>
               </View>
 
-              <Text style={styles.timerText}>{formatTime(remaining)}</Text>
+              <Text style={[styles.timerText, { fontSize: timerFontSize }]}>
+                {formatTime(remaining)}
+              </Text>
 
-              {/* progress */}
-              <View style={styles.progressTrack}>
+              <View style={[styles.progressTrack, isSmall && styles.progressTrackSmall]}>
                 <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
               </View>
             </View>
 
             {/* Controls */}
-            <View style={styles.controls}>
+            <View style={[styles.controls, isLarge && styles.controlsRow]}>
               {status === "idle" && (
                 <Pressable
                   onPress={onStart}
-                  style={({ pressed }) => [styles.primaryBtn, pressed && styles.btnPressed]}
+                  style={({ pressed }) => [
+                    styles.primaryBtn,
+                    isLarge && styles.btnGrow,
+                    pressed && styles.btnPressed,
+                  ]}
                 >
                   <LinearGradient
                     colors={["rgba(126,231,255,0.95)", "rgba(156,120,255,0.95)"]}
@@ -290,7 +327,11 @@ export default function SessionScreen() {
                 <>
                   <Pressable
                     onPress={onPause}
-                    style={({ pressed }) => [styles.secondaryBtn, pressed && styles.btnPressed]}
+                    style={({ pressed }) => [
+                      styles.secondaryBtn,
+                      isLarge && styles.btnGrow,
+                      pressed && styles.btnPressed,
+                    ]}
                   >
                     <View style={styles.btnInner}>
                       <Ionicons name="pause" size={18} color="rgba(255,255,255,0.92)" />
@@ -300,7 +341,11 @@ export default function SessionScreen() {
 
                   <Pressable
                     onPress={onFinish}
-                    style={({ pressed }) => [styles.ghostBtn, pressed && styles.btnPressed]}
+                    style={({ pressed }) => [
+                      styles.ghostBtn,
+                      isLarge && styles.btnGrow,
+                      pressed && styles.btnPressed,
+                    ]}
                   >
                     <View style={styles.btnInner}>
                       <Ionicons name="checkmark" size={18} color="rgba(255,255,255,0.88)" />
@@ -314,7 +359,11 @@ export default function SessionScreen() {
                 <>
                   <Pressable
                     onPress={onResume}
-                    style={({ pressed }) => [styles.primaryBtn, pressed && styles.btnPressed]}
+                    style={({ pressed }) => [
+                      styles.primaryBtn,
+                      isLarge && styles.btnGrow,
+                      pressed && styles.btnPressed,
+                    ]}
                   >
                     <LinearGradient
                       colors={["rgba(126,231,255,0.95)", "rgba(156,120,255,0.95)"]}
@@ -331,7 +380,11 @@ export default function SessionScreen() {
 
                   <Pressable
                     onPress={onFinish}
-                    style={({ pressed }) => [styles.ghostBtn, pressed && styles.btnPressed]}
+                    style={({ pressed }) => [
+                      styles.ghostBtn,
+                      isLarge && styles.btnGrow,
+                      pressed && styles.btnPressed,
+                    ]}
                   >
                     <View style={styles.btnInner}>
                       <Ionicons name="checkmark" size={18} color="rgba(255,255,255,0.88)" />
@@ -344,7 +397,11 @@ export default function SessionScreen() {
               {status === "done" && (
                 <Pressable
                   onPress={onRestart}
-                  style={({ pressed }) => [styles.secondaryBtn, pressed && styles.btnPressed]}
+                  style={({ pressed }) => [
+                    styles.secondaryBtn,
+                    isLarge && styles.btnGrow,
+                    pressed && styles.btnPressed,
+                  ]}
                 >
                   <View style={styles.btnInner}>
                     <Ionicons name="refresh" size={18} color="rgba(255,255,255,0.92)" />
@@ -355,7 +412,7 @@ export default function SessionScreen() {
             </View>
 
             <Text style={styles.note}>
-              Prototype timer — counts down {item.minutes} minutes. (No background persistence.)
+              Prototype timer — counts down {item.minutes} minutes.
             </Text>
           </View>
         </ScrollView>
@@ -367,17 +424,8 @@ export default function SessionScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#05060A" },
 
-  loading: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-  loadingText: {
-    color: "rgba(255,255,255,0.70)",
-    fontSize: 13,
-    fontWeight: "600",
-  },
+  loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
+  loadingText: { color: "rgba(255,255,255,0.70)", fontSize: 13, fontWeight: "600" },
 
   notFound: {
     flex: 1,
@@ -386,42 +434,26 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 12,
   },
-  notFoundTitle: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  notFoundSub: {
-    color: "rgba(255,255,255,0.65)",
-    fontSize: 13,
-    textAlign: "center",
-  },
+  notFoundTitle: { color: "#FFFFFF", fontSize: 18, fontWeight: "800" },
+  notFoundSub: { color: "rgba(255,255,255,0.65)", fontSize: 13, textAlign: "center" },
 
   bg: { flex: 1 },
   bgImage: { resizeMode: "cover" },
 
-  blob: {
-    position: "absolute",
-    width: 520,
-    height: 520,
-    borderRadius: 260,
-  },
+  blob: { position: "absolute" },
   blobTop: { top: -280, left: -200 },
   blobBottom: { bottom: -300, right: -210 },
 
   scroll: { flex: 1 },
   content: {
-    paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 24,
     gap: 16,
   },
-
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  contentSmall: {
+    gap: 14,
   },
+
+  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   iconBtn: {
     width: 40,
     height: 40,
@@ -433,11 +465,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  brandRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
+  brandRow: { flexDirection: "row", alignItems: "center", gap: 10, maxWidth: "70%" },
   brandIcon: {
     width: 28,
     height: 28,
@@ -457,19 +485,11 @@ const styles = StyleSheet.create({
   },
 
   titleBlock: { gap: 10, paddingTop: 4 },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  title: {
-    flex: 1,
-    minWidth: 0,
-    color: "#FFFFFF",
-    fontSize: 26,
-    fontWeight: "800",
-    letterSpacing: -0.3,
-  },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+
+  title: { flex: 1, minWidth: 0, color: "#FFFFFF", fontSize: 26, fontWeight: "800", letterSpacing: -0.3 },
+  titleSmall: { fontSize: 22 },
+
   premiumPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -479,23 +499,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  premiumPillText: {
-    color: "#0B0C10",
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 0.3,
-  },
+  premiumPillText: { color: "#0B0C10", fontSize: 11, fontWeight: "900", letterSpacing: 0.3 },
+
   metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  metaText: {
-    color: "rgba(255,255,255,0.75)",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  desc: {
-    color: "rgba(255,255,255,0.70)",
-    fontSize: 14,
-    lineHeight: 20,
-  },
+  metaText: { color: "rgba(255,255,255,0.75)", fontSize: 13, fontWeight: "600" },
+
+  desc: { color: "rgba(255,255,255,0.70)", fontSize: 14, lineHeight: 20 },
+  descSmall: { fontSize: 13, lineHeight: 19 },
 
   glassCard: {
     borderRadius: 18,
@@ -505,21 +515,13 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.14)",
     gap: 12,
   },
+  glassCardSmall: { padding: 12, gap: 10 },
 
   timerTop: { gap: 10 },
   timerLabelRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  timerLabel: {
-    color: "rgba(255,255,255,0.82)",
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: 0.2,
-  },
-  timerText: {
-    color: "#FFFFFF",
-    fontSize: 44,
-    fontWeight: "900",
-    letterSpacing: -0.8,
-  },
+  timerLabel: { color: "rgba(255,255,255,0.82)", fontSize: 13, fontWeight: "800", letterSpacing: 0.2 },
+
+  timerText: { color: "#FFFFFF", fontWeight: "900", letterSpacing: -0.8 },
 
   progressTrack: {
     height: 10,
@@ -529,38 +531,20 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.12)",
     overflow: "hidden",
   },
-  progressFill: {
-    height: "100%",
-    borderRadius: 999,
-    backgroundColor: "rgba(126,231,255,0.55)",
-  },
+  progressTrackSmall: { height: 8 },
+
+  progressFill: { height: "100%", borderRadius: 999, backgroundColor: "rgba(126,231,255,0.55)" },
 
   controls: { gap: 10 },
+  controlsRow: { flexDirection: "row" },
 
-  btnInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
+  btnGrow: { flex: 1 },
 
-  primaryBtn: {
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.16)",
-  },
-  primaryGradient: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-  },
-  primaryBtnText: {
-    color: "#0B0C10",
-    fontSize: 14,
-    fontWeight: "900",
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-  },
+  btnInner: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
+
+  primaryBtn: { borderRadius: 16, overflow: "hidden", borderWidth: 1, borderColor: "rgba(255,255,255,0.16)" },
+  primaryGradient: { paddingVertical: 12, paddingHorizontal: 12 },
+  primaryBtnText: { color: "#0B0C10", fontSize: 14, fontWeight: "900", letterSpacing: 0.4, textTransform: "uppercase" },
 
   secondaryBtn: {
     borderRadius: 16,
@@ -570,13 +554,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.16)",
   },
-  secondaryBtnText: {
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 14,
-    fontWeight: "900",
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-  },
+  secondaryBtnText: { color: "rgba(255,255,255,0.92)", fontSize: 14, fontWeight: "900", letterSpacing: 0.4, textTransform: "uppercase" },
 
   ghostBtn: {
     borderRadius: 16,
@@ -586,22 +564,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
   },
-  ghostBtnText: {
-    color: "rgba(255,255,255,0.88)",
-    fontSize: 14,
-    fontWeight: "900",
-    letterSpacing: 0.4,
-    textTransform: "uppercase",
-  },
+  ghostBtnText: { color: "rgba(255,255,255,0.88)", fontSize: 14, fontWeight: "900", letterSpacing: 0.4, textTransform: "uppercase" },
 
-  btnPressed: {
-    transform: [{ scale: 0.99 }],
-    opacity: 0.95,
-  },
+  btnPressed: { transform: [{ scale: 0.99 }], opacity: 0.95 },
 
-  note: {
-    color: "rgba(255,255,255,0.55)",
-    fontSize: 12,
-    lineHeight: 16,
-  },
+  note: { color: "rgba(255,255,255,0.55)", fontSize: 12, lineHeight: 16 },
 });

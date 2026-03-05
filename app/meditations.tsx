@@ -8,19 +8,27 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { MEDITATIONS, Meditation } from "../src/data/meditations";
 import { Mood, buildPrompt, mockLLM } from "../src/utils/ai";
 import React, { useCallback, useMemo, useState } from "react";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useSubscription } from "../src/state/subscription";
 
 export default function MeditationsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isSmall = width <= 360;
+  const isLarge = width >= 430;
+
+  const padH = isSmall ? 14 : 16;
+
   const { isSubscribed, hydrated, reset } = useSubscription();
 
   // ===== AI vibe feature state =====
@@ -39,6 +47,8 @@ export default function MeditationsScreen() {
       ] as const,
     []
   );
+
+  const showPromptLabel = isSmall ? "Prompt" : "Show prompt";
 
   const onGenerate = useCallback(async () => {
     if (aiLoading) return;
@@ -78,6 +88,10 @@ export default function MeditationsScreen() {
     await reset();
   }, [hydrated, isSubscribed, reset, router]);
 
+  const cardMinHeight = isSmall ? 112 : isLarge ? 140 : 124;
+  const cardPad = isSmall ? 12 : 14;
+  const cardTitleSize = isSmall ? 15 : 16;
+
   const renderItem = useCallback(
     ({ item }: { item: Meditation }) => {
       const locked = item.isPremium && !isSubscribed;
@@ -90,21 +104,26 @@ export default function MeditationsScreen() {
           <ImageBackground
             source={{ uri: item.imageUrl }}
             resizeMode="cover"
-            style={styles.cardImage}
+            style={[styles.cardImage, { minHeight: cardMinHeight }]}
             imageStyle={styles.cardImageInner}
           >
             <View style={styles.imageTint} />
 
-            <View style={styles.cardContent}>
+            <View style={[styles.cardContent, { padding: cardPad }]}>
               <View style={styles.titleRow}>
-                <Text numberOfLines={1} style={styles.cardTitle}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.cardTitle, { fontSize: cardTitleSize }]}
+                >
                   {item.title}
                 </Text>
 
                 {item.isPremium && (
                   <View style={styles.premiumPill}>
                     <Ionicons name="sparkles" size={12} color="#0B0C10" />
-                    <Text style={styles.premiumPillText}>Premium</Text>
+                    <Text style={styles.premiumPillText} numberOfLines={1}>
+                      Premium
+                    </Text>
                   </View>
                 )}
               </View>
@@ -115,7 +134,9 @@ export default function MeditationsScreen() {
                   size={14}
                   color="rgba(255,255,255,0.75)"
                 />
-                <Text style={styles.metaText}>{item.minutes} min</Text>
+                <Text style={styles.metaText} numberOfLines={1}>
+                  {item.minutes} min
+                </Text>
               </View>
             </View>
 
@@ -123,7 +144,9 @@ export default function MeditationsScreen() {
               <View style={styles.lockOverlay} pointerEvents="none">
                 <View style={styles.lockBadge}>
                   <Ionicons name="lock-closed" size={18} color="#EDEBFF" />
-                  <Text style={styles.lockText}>Locked</Text>
+                  <Text style={styles.lockText} numberOfLines={1}>
+                    Locked
+                  </Text>
                 </View>
               </View>
             )}
@@ -131,21 +154,23 @@ export default function MeditationsScreen() {
         </Pressable>
       );
     },
-    [isSubscribed, onPressCard]
+    [cardMinHeight, cardPad, cardTitleSize, isSubscribed, onPressCard]
   );
 
   const ListHeader = useMemo(() => {
     return (
-      <View style={styles.headerWrap}>
+      <View style={[styles.headerWrap, isSmall && styles.headerWrapSmall]}>
         {/* Top header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <View style={styles.brandIcon}>
               <Ionicons name="leaf-outline" size={18} color="#EDEBFF" />
             </View>
-            <View>
-              <Text style={styles.brandTitle}>ZenPulse</Text>
-              <Text style={styles.brandSubtitle}>
+            <View style={styles.brandTextWrap}>
+              <Text style={[styles.brandTitle, isSmall && styles.brandTitleSmall]} numberOfLines={1}>
+                ZenPulse
+              </Text>
+              <Text style={styles.brandSubtitle} numberOfLines={1}>
                 {isSubscribed ? "Premium unlocked" : "Free access"}
               </Text>
             </View>
@@ -157,6 +182,7 @@ export default function MeditationsScreen() {
               styles.headerBtn,
               isSubscribed ? styles.headerBtnReset : styles.headerBtnPremium,
               pressed && styles.headerBtnPressed,
+              isSmall && styles.headerBtnSmall,
             ]}
           >
             <Ionicons
@@ -165,11 +191,11 @@ export default function MeditationsScreen() {
               color={isSubscribed ? "rgba(255,255,255,0.92)" : "#0B0C10"}
             />
             <Text
+              numberOfLines={1}
               style={[
                 styles.headerBtnText,
-                isSubscribed
-                  ? styles.headerBtnTextReset
-                  : styles.headerBtnTextPremium,
+                isSubscribed ? styles.headerBtnTextReset : styles.headerBtnTextPremium,
+                isSmall && styles.headerBtnTextSmall,
               ]}
             >
               {isSubscribed ? "Reset" : "Go Premium"}
@@ -178,15 +204,17 @@ export default function MeditationsScreen() {
         </View>
 
         {/* AI Mood block */}
-        <View style={styles.aiCard}>
+        <View style={[styles.aiCard, isSmall && styles.aiCardSmall]}>
           <View style={styles.aiTopRow}>
             <View style={styles.aiTitleRow}>
               <View style={styles.aiIcon}>
                 <Ionicons name="sparkles-outline" size={18} color="#EDEBFF" />
               </View>
-              <View>
-                <Text style={styles.aiTitle}>AI Настрой дня</Text>
-                <Text style={styles.aiSubtitle}>
+              <View style={styles.aiTextWrap}>
+                <Text style={[styles.aiTitle, isSmall && styles.aiTitleSmall]} numberOfLines={1}>
+                  AI Настрой дня
+                </Text>
+                <Text style={styles.aiSubtitle} numberOfLines={2}>
                   Choose your mood — get a premium affirmation.
                 </Text>
               </View>
@@ -199,6 +227,7 @@ export default function MeditationsScreen() {
                 styles.showPromptBtn,
                 !lastPrompt && styles.showPromptBtnDisabled,
                 pressed && styles.showPromptBtnPressed,
+                isSmall && styles.showPromptBtnSmall,
               ]}
             >
               <Ionicons
@@ -207,12 +236,14 @@ export default function MeditationsScreen() {
                 color={lastPrompt ? "rgba(255,255,255,0.88)" : "rgba(255,255,255,0.45)"}
               />
               <Text
+                numberOfLines={1}
                 style={[
                   styles.showPromptText,
                   !lastPrompt && { color: "rgba(255,255,255,0.45)" },
+                  isSmall && styles.showPromptTextSmall,
                 ]}
               >
-                Show prompt
+                {showPromptLabel}
               </Text>
             </Pressable>
           </View>
@@ -228,13 +259,18 @@ export default function MeditationsScreen() {
                     styles.moodBtn,
                     active && styles.moodBtnActive,
                     pressed && styles.moodBtnPressed,
+                    isSmall && styles.moodBtnSmall,
                   ]}
                 >
-                  <Text style={styles.moodEmoji}>{m.emoji}</Text>
+                  <Text style={[styles.moodEmoji, isSmall && styles.moodEmojiSmall]}>
+                    {m.emoji}
+                  </Text>
                   <Text
+                    numberOfLines={1}
                     style={[
                       styles.moodLabel,
                       active && styles.moodLabelActive,
+                      isSmall && styles.moodLabelSmall,
                     ]}
                   >
                     {m.label}
@@ -257,7 +293,7 @@ export default function MeditationsScreen() {
               colors={["rgba(126, 231, 255, 0.95)", "rgba(156, 120, 255, 0.95)"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.generateGradient}
+              style={[styles.generateGradient, isSmall && styles.generateGradientSmall]}
             >
               <View style={styles.generateInner}>
                 {aiLoading ? (
@@ -265,7 +301,9 @@ export default function MeditationsScreen() {
                 ) : (
                   <>
                     <Ionicons name="flash-outline" size={18} color="#0B0C10" />
-                    <Text style={styles.generateText}>Generate</Text>
+                    <Text style={[styles.generateText, isSmall && styles.generateTextSmall]}>
+                      Generate
+                    </Text>
                   </>
                 )}
               </View>
@@ -274,24 +312,30 @@ export default function MeditationsScreen() {
 
           {aiText && (
             <View style={styles.aiResult}>
-              <Text style={styles.aiResultLabel}>Today’s affirmation</Text>
+              <Text style={styles.aiResultLabel} numberOfLines={1}>
+                Today’s affirmation
+              </Text>
               <Text style={styles.aiResultText}>{aiText}</Text>
             </View>
           )}
         </View>
 
-        <Text style={styles.listTitle}>Meditations</Text>
+        <Text style={styles.listTitle} numberOfLines={1}>
+          Meditations
+        </Text>
       </View>
     );
   }, [
     aiLoading,
     aiText,
+    isSmall,
     isSubscribed,
     lastPrompt,
     mood,
     moodOptions,
     onGenerate,
     onPressHeaderAction,
+    showPromptLabel,
   ]);
 
   if (!hydrated) {
@@ -312,7 +356,13 @@ export default function MeditationsScreen() {
         keyExtractor={(i) => i.id}
         renderItem={renderItem}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          {
+            paddingHorizontal: padH,
+            paddingBottom: insets.bottom + 18,
+          },
+        ]}
         ListHeaderComponent={ListHeader}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
       />
@@ -324,14 +374,24 @@ export default function MeditationsScreen() {
         animationType="fade"
         onRequestClose={() => setPromptVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setPromptVisible(false)} />
+        <View
+          style={[
+            styles.modalOverlay,
+            { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 },
+          ]}
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setPromptVisible(false)}
+          />
 
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleRow}>
                 <Ionicons name="code-slash" size={18} color="#EDEBFF" />
-                <Text style={styles.modalTitle}>Prompt to LLM</Text>
+                <Text style={styles.modalTitle} numberOfLines={1}>
+                  Prompt to LLM
+                </Text>
               </View>
 
               <Pressable
@@ -368,20 +428,18 @@ export default function MeditationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: "#05060A",
-  },
+  safe: { flex: 1, backgroundColor: "#05060A" },
 
   listContent: {
-    paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 18,
   },
 
   headerWrap: {
     paddingBottom: 12,
     gap: 14,
+  },
+  headerWrapSmall: {
+    gap: 12,
   },
 
   header: {
@@ -412,12 +470,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
+  brandTextWrap: { flex: 1, minWidth: 0 },
+
   brandTitle: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "800",
     letterSpacing: 0.2,
   },
+  brandTitleSmall: { fontSize: 15 },
 
   brandSubtitle: {
     color: "rgba(255,255,255,0.60)",
@@ -434,11 +495,14 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
   },
-
-  headerBtnPressed: {
-    transform: [{ scale: 0.99 }],
-    opacity: 0.95,
+  headerBtnSmall: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    gap: 6,
   },
+
+  headerBtnPressed: { transform: [{ scale: 0.99 }], opacity: 0.95 },
 
   headerBtnPremium: {
     backgroundColor: "rgba(255,255,255,0.90)",
@@ -450,19 +514,11 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.18)",
   },
 
-  headerBtnText: {
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: 0.2,
-  },
+  headerBtnText: { fontSize: 13, fontWeight: "800", letterSpacing: 0.2 },
+  headerBtnTextSmall: { fontSize: 12 },
 
-  headerBtnTextPremium: {
-    color: "#0B0C10",
-  },
-
-  headerBtnTextReset: {
-    color: "rgba(255,255,255,0.92)",
-  },
+  headerBtnTextPremium: { color: "#0B0C10" },
+  headerBtnTextReset: { color: "rgba(255,255,255,0.92)" },
 
   // ===== AI card =====
   aiCard: {
@@ -473,6 +529,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.14)",
     gap: 12,
   },
+  aiCardSmall: { padding: 12, gap: 10 },
 
   aiTopRow: {
     flexDirection: "row",
@@ -500,18 +557,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
+  aiTextWrap: { flex: 1, minWidth: 0 },
+
   aiTitle: {
     color: "rgba(255,255,255,0.92)",
     fontSize: 15,
     fontWeight: "900",
     letterSpacing: 0.2,
   },
+  aiTitleSmall: { fontSize: 14 },
 
-  aiSubtitle: {
-    color: "rgba(255,255,255,0.60)",
-    fontSize: 12,
-    marginTop: 3,
-  },
+  aiSubtitle: { color: "rgba(255,255,255,0.60)", fontSize: 12, marginTop: 3 },
 
   showPromptBtn: {
     flexDirection: "row",
@@ -524,24 +580,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.14)",
   },
-  showPromptBtnDisabled: {
-    opacity: 0.8,
-  },
-  showPromptBtnPressed: {
-    transform: [{ scale: 0.99 }],
-    opacity: 0.95,
-  },
+  showPromptBtnSmall: { paddingHorizontal: 8, paddingVertical: 8 },
+  showPromptBtnDisabled: { opacity: 0.8 },
+  showPromptBtnPressed: { transform: [{ scale: 0.99 }], opacity: 0.95 },
+
   showPromptText: {
     color: "rgba(255,255,255,0.88)",
     fontSize: 12,
     fontWeight: "800",
     letterSpacing: 0.2,
   },
+  showPromptTextSmall: { fontSize: 11 },
 
-  moodRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
+  moodRow: { flexDirection: "row", gap: 10 },
 
   moodBtn: {
     flex: 1,
@@ -555,26 +606,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 4,
   },
+  moodBtnSmall: { paddingVertical: 8, borderRadius: 12 },
   moodBtnActive: {
     backgroundColor: "rgba(126, 231, 255, 0.10)",
     borderColor: "rgba(126, 231, 255, 0.55)",
   },
-  moodBtnPressed: {
-    transform: [{ scale: 0.99 }],
-    opacity: 0.95,
-  },
+  moodBtnPressed: { transform: [{ scale: 0.99 }], opacity: 0.95 },
 
-  moodEmoji: {
-    fontSize: 20,
-  },
-  moodLabel: {
-    color: "rgba(255,255,255,0.70)",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  moodLabelActive: {
-    color: "rgba(255,255,255,0.92)",
-  },
+  moodEmoji: { fontSize: 20 },
+  moodEmojiSmall: { fontSize: 18 },
+
+  moodLabel: { color: "rgba(255,255,255,0.70)", fontSize: 12, fontWeight: "700" },
+  moodLabelSmall: { fontSize: 11 },
+  moodLabelActive: { color: "rgba(255,255,255,0.92)" },
 
   generateBtn: {
     borderRadius: 16,
@@ -582,22 +626,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.16)",
   },
-  generateBtnPressed: {
-    transform: [{ scale: 0.99 }],
-  },
-  generateBtnDisabled: {
-    opacity: 0.7,
-  },
-  generateGradient: {
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-  },
-  generateInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
+  generateBtnPressed: { transform: [{ scale: 0.99 }] },
+  generateBtnDisabled: { opacity: 0.7 },
+  generateGradient: { paddingVertical: 12, paddingHorizontal: 12 },
+  generateGradientSmall: { paddingVertical: 11, paddingHorizontal: 10 },
+
+  generateInner: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
   generateText: {
     color: "#0B0C10",
     fontSize: 14,
@@ -605,6 +639,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     textTransform: "uppercase",
   },
+  generateTextSmall: { fontSize: 13 },
 
   aiResult: {
     borderRadius: 16,
@@ -614,26 +649,10 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.12)",
     gap: 6,
   },
-  aiResultLabel: {
-    color: "rgba(255,255,255,0.70)",
-    fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 0.2,
-  },
-  aiResultText: {
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: "600",
-  },
+  aiResultLabel: { color: "rgba(255,255,255,0.70)", fontSize: 12, fontWeight: "800", letterSpacing: 0.2 },
+  aiResultText: { color: "rgba(255,255,255,0.92)", fontSize: 14, lineHeight: 20, fontWeight: "600" },
 
-  listTitle: {
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 15,
-    fontWeight: "900",
-    letterSpacing: 0.2,
-    marginTop: 2,
-  },
+  listTitle: { color: "rgba(255,255,255,0.92)", fontSize: 15, fontWeight: "900", letterSpacing: 0.2, marginTop: 2 },
 
   // ===== Cards =====
   card: {
@@ -643,45 +662,18 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.12)",
     backgroundColor: "rgba(255,255,255,0.06)",
   },
+  cardPressed: { transform: [{ scale: 0.995 }], opacity: 0.96 },
 
-  cardPressed: {
-    transform: [{ scale: 0.995 }],
-    opacity: 0.96,
-  },
+  cardImage: { justifyContent: "flex-end" },
+  cardImageInner: { borderRadius: 18 },
 
-  cardImage: {
-    minHeight: 124,
-    justifyContent: "flex-end",
-  },
+  imageTint: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.28)" },
 
-  cardImageInner: {
-    borderRadius: 18,
-  },
+  cardContent: { gap: 8 },
 
-  imageTint: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.28)",
-  },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 10 },
 
-  cardContent: {
-    padding: 14,
-    gap: 8,
-  },
-
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-
-  cardTitle: {
-    flex: 1,
-    minWidth: 0,
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "800",
-    letterSpacing: -0.2,
-  },
+  cardTitle: { flex: 1, minWidth: 0, color: "#FFFFFF", fontWeight: "800", letterSpacing: -0.2 },
 
   premiumPill: {
     flexDirection: "row",
@@ -692,32 +684,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
+  premiumPillText: { color: "#0B0C10", fontSize: 11, fontWeight: "900", letterSpacing: 0.3 },
 
-  premiumPillText: {
-    color: "#0B0C10",
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 0.3,
-  },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  metaText: { color: "rgba(255,255,255,0.75)", fontSize: 13, fontWeight: "600" },
 
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-
-  metaText: {
-    color: "rgba(255,255,255,0.75)",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-
-  lockOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(10, 10, 12, 0.62)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
+  lockOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(10, 10, 12, 0.62)", justifyContent: "center", alignItems: "center" },
 
   lockBadge: {
     flexDirection: "row",
@@ -731,26 +703,11 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.16)",
   },
 
-  lockText: {
-    color: "#EDEBFF",
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: 0.2,
-  },
+  lockText: { color: "#EDEBFF", fontSize: 13, fontWeight: "800", letterSpacing: 0.2 },
 
   // ===== Loading =====
-  loading: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-  },
-
-  loadingText: {
-    color: "rgba(255,255,255,0.70)",
-    fontSize: 13,
-    fontWeight: "600",
-  },
+  loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10 },
+  loadingText: { color: "rgba(255,255,255,0.70)", fontSize: 13, fontWeight: "600" },
 
   // ===== Modal =====
   modalOverlay: {
@@ -779,18 +736,9 @@ const styles = StyleSheet.create({
     borderBottomColor: "rgba(255,255,255,0.10)",
   },
 
-  modalTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
+  modalTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
 
-  modalTitle: {
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 14,
-    fontWeight: "900",
-    letterSpacing: 0.2,
-  },
+  modalTitle: { color: "rgba(255,255,255,0.92)", fontSize: 14, fontWeight: "900", letterSpacing: 0.2 },
 
   modalClose: {
     width: 32,
@@ -803,18 +751,9 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.12)",
   },
 
-  modalBody: {
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 14,
-  },
+  modalBody: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14 },
 
-  modalHint: {
-    color: "rgba(255,255,255,0.60)",
-    fontSize: 12,
-    marginBottom: 10,
-    lineHeight: 16,
-  },
+  modalHint: { color: "rgba(255,255,255,0.60)", fontSize: 12, marginBottom: 10, lineHeight: 16 },
 
   promptBox: {
     borderRadius: 14,
